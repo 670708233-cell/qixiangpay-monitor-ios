@@ -89,9 +89,10 @@ enum Crypto {
         let chunk = 32768
         var dst = [UInt8](repeating: 0, count: chunk)
         var status: Int32 = Z_OK
+        let srcCount = src.count
         src.withUnsafeMutableBytes { ip in
             stream.next_in = ip.baseAddress?.assumingMemoryBound(to: UInt8.self)
-            stream.avail_in = UInt32(src.count)
+            stream.avail_in = UInt32(srcCount)
             repeat {
                 dst.withUnsafeMutableBytes { op in
                     stream.next_out = op.baseAddress?.assumingMemoryBound(to: UInt8.self)
