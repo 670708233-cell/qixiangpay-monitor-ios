@@ -28,6 +28,12 @@ for sf in swift_files:
 for pf in plist_files:
     print(f"  {pf}")
 
+# 顶层资源目录（.xcassets → Resources phase 编译为 Assets.car）
+xcassets = [d for d in sorted(os.listdir(SRC_DIR))
+            if d.endswith(".xcassets") and os.path.isdir(os.path.join(SRC_DIR, d))]
+for xc in xcassets:
+    print(f"  QixiangPayMonitor/{xc} (asset catalog)")
+
 # Generate unique 24-char hex IDs
 def gen_id(seed):
     h = hashlib.md5(seed.encode()).hexdigest()
@@ -78,6 +84,16 @@ for f in all_files:
     parent_key = "/".join(parent_parts)
     groups[parent_key][1].append(fid)
 
+# xcassets：FileReference + PBXBuildFile(Resources) + 挂到 QixiangPayMonitor 组
+# key 带目录前缀，basename 作为组内 path（组已有 path=QixiangPayMonitor）
+for xc in xcassets:
+    key = "QixiangPayMonitor/" + xc
+    fid = gen_id("file:" + key)
+    file_refs[key] = fid
+    build_files[key] = gen_id("build:" + key)
+    ensure_group(["QixiangPayMonitor"])
+    groups["QixiangPayMonitor"][1].append(fid)
+
 # Generate project.pbxproj content
 lines = []
 lines.append("// !$*UTF8*$!")
@@ -99,15 +115,18 @@ for f, fid in sorted(file_refs.items()):
         lines.append(f"\t\t{fid} /* {basename} */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = {basename}; sourceTree = \"<group>\"; }};")
     elif f.endswith(".plist"):
         lines.append(f"\t\t{fid} /* {basename} */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = {basename}; sourceTree = \"<group>\"; }};")
+    elif f.endswith(".xcassets"):
+        lines.append(f"\t\t{fid} /* {basename} */ = {{isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = {basename}; sourceTree = \"<group>\"; }};")
 lines.append("/* End PBXFileReference section */")
 lines.append("")
 
-# PBXBuildFile section - Swift sources only
+# PBXBuildFile section - Swift sources + asset catalogs (Resources)
 lines.append("/* Begin PBXBuildFile section */")
 for f, bid in sorted(build_files.items()):
     fid = file_refs[f]
     basename = os.path.basename(f)
-    lines.append(f"\t\t{bid} /* {basename} in Sources */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
+    phase = "Resources" if f.endswith(".xcassets") else "Sources"
+    lines.append(f"\t\t{bid} /* {basename} in {phase} */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
 lines.append("/* End PBXBuildFile section */")
 lines.append("")
 
@@ -219,12 +238,15 @@ lines.append("\t\t};")
 lines.append("/* End PBXProject section */")
 lines.append("")
 
-# PBXResourcesBuildPhase section (empty; Info.plist handled by INFOPLIST_FILE)
+# PBXResourcesBuildPhase section (asset catalogs; Info.plist handled by INFOPLIST_FILE)
 lines.append("/* Begin PBXResourcesBuildPhase section */")
 lines.append(f"\t\t{res_phase_id} /* Resources */ = {{")
 lines.append("\t\t\tisa = PBXResourcesBuildPhase;")
 lines.append("\t\t\tbuildActionMask = 2147483647;")
 lines.append("\t\t\tfiles = (")
+for f, bid in sorted(build_files.items()):
+    if f.endswith(".xcassets"):
+        lines.append(f"\t\t\t\t{bid} /* {os.path.basename(f)} in Resources */,")
 lines.append("\t\t\t);")
 lines.append("\t\t\trunOnlyForDeploymentPostprocessing = 0;")
 lines.append("\t\t};")
@@ -289,6 +311,7 @@ def build_config(config_id, name, is_target, is_debug):
         lines.append("\t\t\t\tLD_RUNPATH_SEARCH_PATHS = (\"$(inherited)\", \"@executable_path/Frameworks\", );")
         lines.append("\t\t\t\tMARKETING_VERSION = 1.0;")
         lines.append("\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.doushujun.paymon;")
+        lines.append("\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;")
         lines.append("\t\t\t\tPRODUCT_NAME = \"$(TARGET_NAME)\";")
         lines.append("\t\t\t\tSWIFT_VERSION = 5.0;")
         lines.append("\t\t\t\tSWIFT_STRICT_CONCURRENCY = minimal;")

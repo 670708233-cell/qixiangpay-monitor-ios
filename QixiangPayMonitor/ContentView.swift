@@ -82,7 +82,7 @@ struct ContentView: View {
 
     private var title: some View {
         VStack(spacing: 2) {
-            Text("收款播报")
+            Text("启象收款播报")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundColor(cyan)
                 .kerning(3)

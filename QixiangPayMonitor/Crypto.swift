@@ -101,6 +101,8 @@ enum Crypto {
                 }
                 let produced = chunk - Int(stream.avail_out)
                 if produced > 0 { out.append(contentsOf: dst[0..<produced]) }
+                // Z_BUF_ERROR（输入耗尽且无进展）或零产出：终止防死循环
+                if status != Z_OK || produced == 0 { break }
             } while status == Z_OK
         }
         return out
@@ -123,9 +125,10 @@ enum Crypto {
 
     static func hex(_ data: Data) -> String { data.hex }
 
-    /// Kotlin s.substring(a, b) 语义：[a, b)
+    /// Kotlin s.substring(a, b) 语义：[a, b)。越界返回空串（lot_number 异常短时防崩溃）
     static func substring(_ s: String, _ a: Int, _ b: Int) -> String {
         let arr = Array(s)
+        guard a >= 0, b <= arr.count, a < b else { return "" }
         return String(arr[a..<b])
     }
 }
