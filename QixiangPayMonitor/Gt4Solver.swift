@@ -210,6 +210,11 @@ enum Gt4Solver {
         } }
         if x1 < 0 { return nil }
         let aw = x1 - x0 + 1, ah = y1 - y0 + 1
+        // 关键防御：slice bbox 超出背景图尺寸时 0...(H-ah) 会 fatalError（catch 接不住）
+        guard ah >= 1, aw >= 1, H >= ah, W >= aw else {
+            L("[gt4] 尺寸异常 bg=\(W)x\(H) slice_bbox=\(aw)x\(ah)（跳过本轮）")
+            return nil
+        }
         var area = 0
         var am = [[Bool]](repeating: [Bool](repeating: false, count: aw), count: ah)
         for r in 0..<ah { for c in 0..<aw {

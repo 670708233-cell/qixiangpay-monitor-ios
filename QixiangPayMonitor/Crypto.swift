@@ -82,7 +82,7 @@ enum Crypto {
         var stream = z_stream()
         let rc = deflateInit2_(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 + 16, 8,
                                Z_DEFAULT_STRATEGY, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
-        precondition(rc == Z_OK, "deflateInit2 failed")
+        guard rc == Z_OK else { return data }  // 理论不达；失败退回原文，verify 失败也不能崩 app
         defer { deflateEnd(&stream) }
         var out = Data()
         var src = [UInt8](data)

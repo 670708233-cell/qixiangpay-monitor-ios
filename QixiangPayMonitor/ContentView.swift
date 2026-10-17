@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 视图模型：承接引擎回调（倒序日志 / 状态 / 运行时长）
 final class AppVM: ObservableObject {
@@ -10,6 +11,7 @@ final class AppVM: ObservableObject {
     @Published var pass: String
     @Published var voiceIdx: Int
     @Published var intervalIdx: Int
+    @Published var crashReport: String?
 
     private let fmt: DateFormatter = {
         let f = DateFormatter()
@@ -18,6 +20,7 @@ final class AppVM: ObservableObject {
     }()
 
     init() {
+        crashReport = CrashRecorder.consumePending()
         let d = UserDefaults.standard
         user = d.string(forKey: "cfg_user") ?? ""
         pass = d.string(forKey: "cfg_pass") ?? ""
@@ -65,6 +68,9 @@ struct ContentView: View {
             Color(red: 0.02, green: 0.04, blue: 0.09).ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 12) {
+                    if let cr = vm.crashReport {
+                        crashBanner(cr)
+                    }
                     title
                     accountFields
                     voicePicker
@@ -78,6 +84,24 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+
+    /// 上次崩溃报告红框（点按复制全文），发回给开发定位
+    private func crashBanner(_ text: String) -> some View {
+        VStack(spacing: 6) {
+            Text("⚠ 上次崩溃报告（点按复制）").font(.system(size: 12, weight: .bold))
+                .foregroundColor(.white)
+            ScrollView {
+                Text(text).font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.9))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: 160)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color(red: 0.42, green: 0.07, blue: 0.07)))
+        .onTapGesture { UIPasteboard.general.string = text }
     }
 
     private var title: some View {
