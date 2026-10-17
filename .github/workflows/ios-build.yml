@@ -1,0 +1,123 @@
+name: iOS Build (Unsigned IPA)
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Unsigned IPA
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Xcode
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep iphoneos
+
+      - name: Generate Xcode project
+        run: python3 generate_project.py
+
+      - name: Clean and Build
+        id: build
+        run: |
+          echo "=== Cleaning ==="
+          rm -rf build
+          mkdir -p build
+
+          echo "=== Building ==="
+          set -o pipefail
+
+          xcodebuild build \
+            -project QixiangPayMonitor.xcodeproj \
+            -scheme QixiangPayMonitor \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee build.log
+
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "Build exit code: $EXIT_CODE"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+          grep -q "BUILD SUCCEEDED" build.log || {
+            echo "ERROR: BUILD SUCCEEDED not found in log"
+            exit 1
+          }
+
+      - name: Find App
+        if: always()
+        run: |
+          echo "=== Looking for .app ==="
+          find build -name "*.app" -type d 2>/dev/null | while read app; do
+            echo "Found: $app"
+            du -sh "$app"
+            ls -la "$app" | head -10
+          done
+
+          echo ""
+          echo "=== Build Products ==="
+          find build/Build/Products -type f 2>/dev/null | head -20
+
+      - name: Package IPA
+        id: package
+        run: |
+          echo "=== Packaging IPA ==="
+          APP=$(find build -name "QixiangPayMonitor.app" -type d 2>/dev/null | head -1)
+
+          echo "App path: '$APP'"
+
+          if [ -z "$APP" ]; then
+            echo "ERROR: No QixiangPayMonitor.app found!"
+            echo "Available apps:"
+            find build -name "*.app" -type d 2>/dev/null
+            exit 1
+          fi
+
+          echo "Found app: $APP"
+          du -sh "$APP"
+
+          # Check binary
+          if [ ! -f "$APP/QixiangPayMonitor" ]; then
+            echo "ERROR: Binary not found!"
+            ls -la "$APP"
+            exit 1
+          fi
+
+          # Package IPA
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP" Payload/
+
+          echo "=== Creating IPA ==="
+          zip -qr QixiangPayMonitor-unsigned.ipa Payload/
+          rm -rf Payload
+
+          if [ -f QixiangPayMonitor-unsigned.ipa ]; then
+            echo "=== IPA created ==="
+            ls -lh QixiangPayMonitor-unsigned.ipa
+            unzip -l QixiangPayMonitor-unsigned.ipa | head -20
+          else
+            echo "ERROR: IPA file not created!"
+            ls -la *.ipa 2>/dev/null || echo "No .ipa files"
+            exit 1
+          fi
+
+      - name: Upload IPA
+        if: steps.package.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: QixiangPayMonitor-unsigned
+          path: QixiangPayMonitor-unsigned.ipa
+          retention-days: 7
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 7
