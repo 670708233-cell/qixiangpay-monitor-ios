@@ -101,7 +101,7 @@ enum Gt4Solver {
     private static func verify(lot: String, payload: String, ptk: String,
                                powDatetime: String, setLeft: Int) throws -> [String: Any] {
         let td = makeTd(setLeft: setLeft)
-        let w = buildW(setLeft: setLeft, lot: lot, powDatetime: powDatetime, tdB64: td.b64, passtime: t2.passtime)
+        let w = buildW(setLeft: setLeft, lot: lot, powDatetime: powDatetime, tdB64: td.b64, passtime: td.passtime)
         let cb = "geetest_\(Int64(Date().timeIntervalSince1970 * 1000))"
         let qs = "/verify?callback=\(cb)&captcha_id=\(CID)&client_type=web&lot_number=\(lot)" +
                  "&payload=\(payload)&process_token=\(ptk)&payload_protocol=1&pt=1&w=\(w)&td=\(td.b64)"
@@ -132,10 +132,10 @@ enum Gt4Solver {
             let f = Double(i) / Double(steps)
             let ease = f < 0.85 ? f * f * (3 - 2 * f) * 1.02 : 1.02 - 0.02 * ((f - 0.85) / 0.15)
             t += 18 + Int.random(in: 0..<24)
-            pt(t, min(0.96, x0r + (setLeft / bgW) * ease), y0r + (Double.random(in: -0.5...0.5) * 0.008), 1)
+            pt(t, min(0.96, x0r + (Double(setLeft) / bgW) * ease), y0r + (Double.random(in: -0.5...0.5) * 0.008), 1)
         }
         t += 2 + Int.random(in: 0..<4)
-        pt(t, min(0.96, x0r + setLeft / bgW), y0r, 2)
+        pt(t, min(0.96, x0r + Double(setLeft) / bgW), y0r, 2)
         let json = "{\"m\":1,\"w\":\(bgW),\"h\":261.53125,\"s\":\(s),\"e\":\(s + Int64(t)),\"p\":[\(pts)]}"
         let gz = Crypto.gzip(Data(json.utf8))
         return (Crypto.b64url(gz), t)

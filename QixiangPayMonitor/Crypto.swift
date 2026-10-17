@@ -12,7 +12,7 @@ enum Crypto {
 
     static func aesCbcPkcs7Encrypt(_ data: Data, key: Data, iv: Data) -> Data? {
         guard key.count == kCCKeySizeAES128, iv.count == kCCBlockSizeAES128 else { return nil }
-        let out = NSMutableData(length: data.count + kCCBlockSizeAES128)!
+        var out = Data(count: data.count + kCCBlockSizeAES128)
         var outLen = 0
         let status = out.withUnsafeMutableBytes { ob in
             data.withUnsafeBytes { ib in
@@ -27,8 +27,8 @@ enum Crypto {
                 }
             }
         }
-        guard status == kCCSuccess else { return nil }
-        return out.subdata(with: NSRange(location: 0, length: outLen))
+        guard status == kCCSuccess, outLen > 0 else { return nil }
+        return out.prefix(outLen)
     }
 
     // MARK: - RSA（PKCS#1 DER 手工构造 → SecKey）
@@ -72,7 +72,8 @@ enum Crypto {
     }
 
     static func hmacSha256Hex(key: Data, msg: Data) -> String {
-        Data(HMAC<Insecure.SHA256>.authenticationCode(for: msg, using: SymmetricKey(data: key))).hex
+        let mac = HMAC<SHA256>.authenticationCode(for: msg, using: SymmetricKey(data: key))
+        return Data(mac).hex
     }
 
     // MARK: - gzip（td 轨迹压缩，RFC1952）

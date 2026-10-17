@@ -98,9 +98,15 @@ struct ContentView: View {
         VStack(spacing: 10) {
             TextField("账号", text: $vm.user)
                 .keyboardType(.phonePad)
-                .textFieldStyle(input)
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.05)))
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
             SecureField("密码", text: $vm.pass)
-                .textFieldStyle(input)
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.05)))
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
         }
     }
 
@@ -193,19 +199,5 @@ struct ContentView: View {
             .foregroundColor(.gray)
             .kerning(1)
             .frame(maxWidth: .infinity)
-    }
-}
-
-extension TextFieldStyle where Self == BasicTextFieldStyle {
-    static var input: BasicTextFieldStyle { BasicTextFieldStyle() }
-}
-
-struct BasicTextFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.05)))
-            .autocorrectionDisabled()
-            .textInputAutocapitalization(.never)
     }
 }
