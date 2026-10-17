@@ -35,9 +35,11 @@ enum Crypto {
 
     static func rsaPkcs1Encrypt(_ plain: Data, modulusHex: String, e: Int) -> Data? {
         guard let n = Data(hex: modulusHex) else { return nil }
-        var exp = Data()
+        // iOS 26 上 Data.insert(=replaceSubrange) 确定性崩溃，一律用 Array 中转
+        var expBytes = [UInt8]()
         var v = e
-        while v > 0 { exp.insert(UInt8(v & 0xFF), at: 0); v >>= 8 }
+        while v > 0 { expBytes.insert(UInt8(v & 0xFF), at: 0); v >>= 8 }
+        let exp = Data(expBytes)
         // PKCS#1: SEQUENCE { INTEGER n, INTEGER e }
         let body = derInteger(n) + derInteger(exp)
         let seq = Data([0x30]) + derLen(body.count) + body
@@ -50,19 +52,39 @@ enum Crypto {
         return enc as Data
     }
 
+    /// DER INTEGER：纯 append 实现（iOS 26 上 Data.insert/removeFirst=replaceSubrange
+    /// 确定性崩溃，RSA 模数首字节必 ≥0x80 导致每次必崩）；输出与旧实现逐位等价
     private static func derInteger(_ v: Data) -> Data {
-        var d = v
-        while d.count > 1 && d.first == 0 { d.removeFirst() }
-        if let f = d.first, f >= 0x80 { d.insert(0, at: 0) }
-        if d.count < 128 { return Data([0x02, UInt8(d.count)]) + d }
-        return Data([0x02]) + derLen(d.count) + d
+        var body = [UInt8]()
+        var started = false
+        for b in v {
+            if started {
+                body.append(b)
+            } else if b != 0 {
+                body.append(b)
+                started = true
+            }
+        }
+        if body.isEmpty { body = [0x00] }        // 值为 0 → 单字节 0（与旧版 removeFirst 保底一致）
+        if body[0] >= 0x80 { body.insert(0x00, at: 0) }  // 防负数（Array.insert 安全）
+        var out = Data([0x02])
+        if body.count < 128 {
+            out.append(UInt8(body.count))
+        } else {
+            out.append(contentsOf: derLen(body.count))
+        }
+        out.append(contentsOf: body)
+        return out
     }
 
     private static func derLen(_ n: Int) -> Data {
         if n < 128 { return Data([UInt8(n)]) }
-        var len = n, bytes = Data()
-        while len > 0 { bytes.insert(UInt8(len & 0xFF), at: 0); len >>= 8 }
-        return Data([UInt8(0x80 | bytes.count)]) + bytes
+        var bytes = [UInt8]()
+        var len = n
+        while len > 0 { bytes.insert(UInt8(len & 0xFF), at: 0); len >>= 8 }  // Array.insert 安全
+        var out = Data([UInt8(0x80 | bytes.count)])
+        out.append(contentsOf: bytes)
+        return out
     }
 
     // MARK: - 哈希
